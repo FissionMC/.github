@@ -1,126 +1,96 @@
+<div align="center">
+
 # Fission MC
 
-**A different kind of Minecraft server.**
+[![Stars](https://img.shields.io/github/stars/FissionMC/FissionMC?style=for-the-badge&logo=github)](https://github.com/FissionMC/FissionMC/stargazers)
+[![Issues](https://img.shields.io/github/issues/FissionMC/FissionMC?style=for-the-badge&logo=github)](https://github.com/FissionMC/FissionMC/issues)
+[![Last commit](https://img.shields.io/github/last-commit/FissionMC/FissionMC?style=for-the-badge&logo=github)](https://github.com/FissionMC/FissionMC/commits/main)
+[![Commits](https://img.shields.io/github/commit-activity/m/FissionMC/FissionMC?style=for-the-badge&logo=github&label=commits%2Fmonth)](https://github.com/FissionMC/FissionMC/graphs/commit-activity)
+[![Minecraft](https://img.shields.io/badge/minecraft-26.3-blue?style=for-the-badge)](#status)
+[![Language](https://img.shields.io/badge/kotlin-jvm-purple?style=for-the-badge&logo=kotlin)](https://github.com/FissionMC/FissionMC)
+[![Status](https://img.shields.io/badge/status-in--development-yellow?style=for-the-badge)](#status)
 
-Fission is an independent Minecraft server software project built from the ground up, designed around multi-instance architecture, concurrent execution, and extensibility.
+> One Minecraft world, many servers.
+> Fission splits a world across several cooperating backend processes behind a master that keeps the player's connection alive, so players cross between them without a loading screen.
 
-Inspired by the ideas behind Folia and the flexibility of the Paper ecosystem, Fission aims to rethink how Minecraft server software is designed, developed, and operated.
-
-Rather than building upon an existing server implementation, Fission is developing its own foundation, avoiding direct dependencies on Minecraft's internal server implementation (NMS) while working toward compatibility with established Bukkit and Paper plugin APIs.
-
-**We're not building another fork. We're building something new.**
+</div>
 
 ---
 
-## What is Fission?
+## What is Fission
 
-Fission is an attempt to rethink the foundations of Minecraft server software.
+Fission is a Minecraft server written in Kotlin for the JVM. It runs the real vanilla server code (Mojang-mapped, loaded through its own class loader and patched at runtime with Mixin), ports Paper's Craft layer so Bukkit and Paper plugins keep working, and adds a built-in network layer on top.
 
-Traditional server implementations have accumulated years of architectural decisions and dependencies. Fission takes the opportunity to approach these challenges differently, with a focus on modularity, concurrency, and multi-instance execution from the beginning.
+Instead of squeezing more out of one process, Fission shards the world in space. Each region of the world belongs to its own backend server, and a **master** sits in front of them:
 
-Our goal is to create server software that can operate across multiple cooperating instances while maintaining a familiar development environment for plugin developers.
+- the master terminates the real client connection and relays it to whichever backend owns the player's position,
+- backends replicate block changes, entities, world settings and chunk data through the master,
+- a player (and their pets, leashed mobs, riders) walks from one backend to the next without the client ever reloading the level.
 
-## Our Goals
+Each backend can stay single-threaded, and you add capacity by adding backends.
 
-- **Multi-instance architecture** — Design server software around multiple cooperating instances rather than treating a single server process as the only execution environment.
-- **Concurrent execution** — Embrace regionized execution and parallelism, taking inspiration from Folia's approach to server performance.
-- **Independent implementation** — Develop our own server architecture from the ground up instead of inheriting an existing implementation.
-- **NMS independence** — Avoid direct dependencies on Minecraft's internal server implementation wherever possible.
-- **Plugin compatibility** — Provide compatibility with established Bukkit and Paper plugin APIs through dedicated compatibility layers.
-- **Modularity** — Keep systems independently maintainable, extensible, and clearly separated.
-- **Performance & scalability** — Build with modern hardware and increasingly demanding Minecraft environments in mind.
+## How it fits together
 
-## Architecture & Compatibility
+| Piece | What it does |
+|---|---|
+| **Master** | Accepts client connections, owns the chunk store and chunk leases, orders replication, owns world settings (time, weather, game rules), runs the safety layer |
+| **Backends** | Paper-compatible servers that tick only the region they own and show neighbouring regions as ghosts |
+| **Regions** | The world is split per dimension into chunk-aligned rectangles, each with one owner, plus a ghost zone around every border |
+| **Seamless switch** | The master rewrites entity ids on the fly (`transplant`), so a border crossing keeps the client's world and player, with no Login or Respawn |
+| **Packet pipeline** | PacketEvents-style pipeline built into the network layer, not a plugin API |
+| **Craft layer** | Bukkit and Paper API implementation (`org.bukkit.craftbukkit.*`) rebuilt on top of the vanilla classes |
 
-Fission is being developed with a clear separation between its internal implementation and external compatibility interfaces.
+## Status
 
-Our intention is to avoid coupling the core implementation to Minecraft's internal classes and implementation details.
+Fission is in active development and **not ready for production**. The foundation, the node network and the master are built, and the border work (handover, ghosts, seamless switching) is being tested live.
 
-Where compatibility requires it, dedicated layers may provide access to existing Bukkit and Paper APIs, including backwards-compatibility implementations where necessary.
+| Milestone | State |
+|---|---|
+| Foundation, node network | done |
+| Master, replication | working, still being hardened |
+| Packet pipeline | mostly built |
+| Regions and presence (borders, handover, ghosts, mob behaviour at the border) | in progress, the current focus |
+| Plugin compatibility, Craft layer depth | in progress |
+| Compatibility test harness, optimization, release | not started |
 
-This allows Fission to pursue an independent architecture without abandoning the existing Minecraft plugin ecosystem.
+The full checklist is the [roadmap](https://github.com/FissionMC/FissionMC/blob/main/ROADMAP.md).
 
-## Team & Governance
+## Repositories
 
-Fission MC is jointly owned and maintained by two project owners.
+| Repository | What it is |
+|---|---|
+| [**FissionMC**](https://github.com/FissionMC/FissionMC) | The server: master, backend, protocol, Craft layer, packet pipeline, test tools |
+| [**.github**](https://github.com/FissionMC/.github) | This profile |
 
-### Project Owners
+More repositories will appear here as parts of the project are split out.
+
+## Team
+
+Fission MC is jointly owned and maintained by two co-owners.
 
 | Member | Role |
 |---|---|
 | [RATR2](https://github.com/RATR2) | Co-Owner |
 | [Al3xSk1](https://github.com/Al3xSk1) | Co-Owner |
 
-Both Co-Owners share equal ownership and overall responsibility for Fission MC, including project direction, governance, infrastructure, and long-term development.
-
-### Maintainer Roles
-
-Fission uses a structured maintainer hierarchy to establish clear responsibilities and ownership across the project.
-
-| Role | Responsibilities |
-|---|---|
-| **Co-Owner** | Equal project ownership, governance, and overall leadership. |
-| **Core Maintainer** | Oversees core repositories, reviews, code quality, and releases across the project. |
-| **Technical Lead** | Oversees the technical direction and development of an assigned subsystem. |
-| **Maintainer** | Maintains assigned repositories or components, reviews contributions, and handles issue management. |
-| **Contributor** | Contributes code, documentation, testing, and improvements. |
-| **Community Member** | Participates in discussions, testing, feedback, and community support. |
-
-### Technical Leadership
-
-As the project develops, technical ownership may be divided into specialized areas:
-
-- **Core & Architecture** — Foundational systems, server lifecycle, and internal architecture.
-- **Execution & Scheduling** — Regionized execution, threading, task scheduling, and concurrency.
-- **Networking & Protocol** — Network connections, protocol handling, and player sessions.
-- **World & Chunk Systems** — World management, chunk loading, entities, and persistence.
-- **Compatibility** — Bukkit/Paper APIs and backwards-compatibility implementations.
-- **Build & Infrastructure** — Build systems, CI/CD, development tooling, and project infrastructure.
-
-Technical Leads are responsible for their assigned areas while working collaboratively with the wider maintenance team.
-
-### Governance Principles
-
-- Both Co-Owners hold equal project authority.
-- Maintainers are trusted to make decisions within their assigned responsibilities.
-- Technical decisions should prioritize maintainability, stability, and architectural consistency.
-- Significant architectural changes should involve the relevant technical leads and maintainers.
-- Contributions should be reviewed fairly and constructively.
-
-## Repositories
-
-Fission is developed as an evolving ecosystem of components and supporting projects.
-
-Explore our organization repositories to follow development, discover individual components, and contribute.
-
-Repositories and their responsibilities will be documented here as the project takes shape.
+Both co-owners share equal ownership and responsibility for project direction, governance and infrastructure. Decisions inside an area are made by the maintainers and technical leads responsible for it, and significant architectural changes involve the people who own the affected areas.
 
 ## Contributing
 
-We welcome contributions from developers interested in improving Minecraft server software.
+1. Look at the [roadmap](https://github.com/FissionMC/FissionMC/blob/main/ROADMAP.md) and the [open issues](https://github.com/FissionMC/FissionMC/issues).
+2. Open an issue or discussion before large changes.
+3. Send changes as a pull request and be ready to talk through the design.
 
-Whether you're working on core functionality, compatibility, performance, documentation, or tooling, contributions are appreciated.
-
-Before contributing:
-
-1. Explore the relevant repository.
-2. Review its contribution guidelines.
-3. Check existing issues and discussions.
-4. Submit changes through a pull request.
-5. Be prepared to discuss implementation details and design decisions.
-
-Please report bugs and feature requests through the appropriate repository's issue tracker.
+Bugs and feature requests go to the issue tracker of the repository they concern.
 
 ## Acknowledgements
 
-Fission recognizes and appreciates the work of the wider Minecraft server development community.
-
-In particular, we acknowledge the contributions of the Bukkit, Spigot, Paper, and Folia projects, whose work has helped shape the ecosystem in which Fission is being developed.
-
-Fission is an independent project and is not an official continuation or fork of these projects.
+Fission builds on ideas from the Bukkit, Spigot, Paper and Folia projects, and on the Mixin and PacketEvents ecosystems. It is an independent project and not an official continuation or fork of any of them.
 
 ---
 
-**Fission MC**
+<div align="center">
 
-*Built from the ground up. Designed for what comes next.*
+*One world. Many servers.*
+
+</div>
